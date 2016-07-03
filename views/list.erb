@@ -1,0 +1,54 @@
+<section id="todos" class="<%= list_class(@list) %>">
+  <header>
+    <h2><%= @list[:name] %></h2>
+    <ul>
+      <li>
+        <form action="/lists/<%= params[:id] || params[:list_id]%>/complete_all" method="post">
+          <button class="check" type="submit">Complete All</button>
+        </form>
+      </li>
+      <li><a class="edit" href="/lists/<%= params[:id] || params[:list_id]%>/edit">Edit List</a></li>
+    </ul>
+  </header>
+
+  <ul>
+    <% sort_todos(@list[:todos]) do |todo| %>
+
+      <li class="<%= todo_class(todo) %>">
+        <!-- check or uncheck todos -->
+        <form action="/lists/<%= params[:id] || params[:list_id]%>/todos/<%= todo[:id] %>/update" method="post" class="check">
+          <input type="hidden" name="completed" value="<%= !todo[:complete] %>" />
+          <button type="submit">Complete</button>
+        </form>
+
+        <!-- display todos -->
+        <h3><%= todo[:name] %></h3>
+        <form action="/lists/<%= params[:id] || params[:list_id]%>/todos/<%= todo[:id] %>" method="post" class="delete">
+          <button type="submit">Delete</button>
+        </form>
+      </li>
+
+    <% end %>
+  </ul
+</section>
+
+<form action="/lists/<%= params[:id] || params[:list_id]%>/todos" method="post">
+  <dl>
+    <dt>
+      <label for="todo">Enter the name for your new task:</label>
+    </dt>
+    <dd>
+      <input name="todo" placeholder="Do me!" type="text" value="">
+    </dd>
+  </dl>
+  <fieldset class="actions">
+    <input type="submit" value="Add">
+  </fieldset>
+</form>
+
+<% content_for :header_links do %>
+  <a class="list" href="/lists">All Lists</a>
+<% end %>
+
+
+
