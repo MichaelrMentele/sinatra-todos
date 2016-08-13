@@ -4,6 +4,8 @@ require "sinatra/reloader" if development?
 require "sinatra/content_for"
 require "tilt/erubis"
 
+require_relative "SessionData.rb"
+
 configure do
   enable :sessions
   set :erb, :escape_html => true
@@ -11,11 +13,11 @@ configure do
 end
 
 before do 
-  session[:lists] ||= []
+  @storage = SessionData.new(session)
 end
 
 not_found do 
-  session[:error] = "URL not found"
+  @storage.error("URL not found")
   redirect "/lists"
 end
 
@@ -24,16 +26,16 @@ end
 ###########
 
 def load_list(id)
-  list = session[:lists].find{ |list| list[:id] == id }
+  list = @storage.findList(id)
   return list if list 
 
-  session[:error] = "The specified list was not found."
+  @storage.error("The specified list was not found.")
   redirect "/lists"
   halt
 end
 
 def error_for_list_name(list_name)
-  if session[:lists].any? {|list| list[:name] == list_name}
+  if @storage.allLists.any? {|list| list[:name] == list_name}
     "Each list name must be unique."
   elsif !(1..100).cover? list_name.size
     "List name must be between 1 and 100 characters."
@@ -67,7 +69,7 @@ end
 
 # View list of lists
 get "/lists" do
-  @lists = session[:lists]
+  @lists = @storage.allLists
   erb :lists, layout: :layout
 end
 
@@ -112,8 +114,9 @@ end
 post "/lists/:list_id/destroy" do 
   list_id = params[:list_id].to_i
   @list = load_list(list_id)
-  session[:lists].delete(@list)
-  session[:success] = "The list has been deleted."
+
+  @storage.delete!(@list)
+  @storage.success("The list has been deleted.")
   
   if env["HTTP_X_REQUESTED_WITH"] == "XMLHttpRequest"
     "/lists"
@@ -128,13 +131,14 @@ post '/lists' do
   
   error = error_for_list_name(list_name)
   if error
-    session[:error] = error
+    @storage.error(error)
     erb :new_list, layout: :layout
   else
-    @lists = session[:lists]
+    @lists = @storage.allLists
     id = next_list_id(@lists)
     @lists << {id: id, name: list_name, todos: []}
-    session[:success] = 'The list has been created.'
+    @storage.success('The list has been created.')
+
     redirect "/lists"
   end
 end
@@ -149,13 +153,13 @@ post "/lists/:list_id/todos" do
   # Validate todo
   error = error_for_todo_name(todo_name)
   if error
-    session[:error] = error
+    @storage.error(error)
     erb :list, layout: :layout
   else
     id = next_todo_id(@list[:todos])
     @list[:todos] << {id: id, name: todo_name, complete: false}
     
-    session[:success] = 'The todo has been created.'
+    @storage.success('The todo has been created.')
     redirect "/lists/#{list_id}"  
   end
 end
@@ -171,7 +175,7 @@ post "/lists/:list_id/todos/:todo_id" do
   if env["HTTP_X_REQUESTED_WITH"] == "XMLHttpRequest"
     status 204
   else
-    session[:success] = "The todo has been deleted."
+    @storage.success("The todo has been deleted.")
     redirect "/lists/#{list_id}"
   end
 end
@@ -187,7 +191,7 @@ post "/lists/:list_id/todos/:todo_id/update" do
   is_completed = params[:completed] == "true"
   todo[:complete] = is_completed
 
-  session[:success] = "The todo has been updated"
+  @storage.success("The todo has been updated")
   
   redirect "/lists/#{list_id}"
 end
