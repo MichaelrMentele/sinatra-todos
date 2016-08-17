@@ -30,9 +30,42 @@ class DatabasePersistence
 		end
 	end
 
-	def delete!(list)
-		# @session[:lists].delete(list)
+	def createNewList(name)
+		sql = "INSERT INTO lists (name) VALUES ($1);"
+		result = query(sql, name)
+		return true
 	end
+
+	def createNewTodo(list_id, name)
+		sql = "INSERT INTO todos (name, list_id) VALUES ($1, $2)"
+		query(sql, name, list_id)
+	end
+
+	def deleteList!(id)
+		query("DELETE FROM todos WHERE list_id = $1", id)
+		query("DELETE FROM lists WHERE id = $1", id)
+	end
+
+	def deleteTodo!(id)
+		query("DELETE FROM todos WHERE id = $1", id)
+	end
+
+	def updateListName(id, name)
+		sql = "UPDATE lists SET name = $1 WHERE id = $2"
+ 		query(sql, name, id)
+	end
+
+	def updateTodoStatus(id, status)
+		sql = "UPDATE todos SET complete = $2 WHERE id = $1"
+		query(sql, id, status)
+	end
+
+	def markAllTodosComplete(list_id)
+		sql = "UPDATE todos SET complete = true WHERE list_id = $1"
+		query(sql, list_id)
+	end
+
+	private
 
 	def getListTodos(list_id)
 		todo_sql = "SELECT * FROM todos WHERE list_id = $1"

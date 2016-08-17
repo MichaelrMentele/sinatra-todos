@@ -1,6 +1,5 @@
 require "sinatra"
 
-require "sinatra/reloader" if development?
 require "sinatra/content_for"
 require "tilt/erubis"
 
@@ -10,6 +9,12 @@ configure do
   enable :sessions
   set :erb, :escape_html => true
   set :session_secret, "secret"
+  
+end
+
+configure(:development) do
+  require "sinatra/reloader"
+  also_reload "data_persistence.rb"
 end
 
 before do 
@@ -48,16 +53,6 @@ def error_for_todo_name(todo_name)
   end
 end
 
-def next_todo_id(todos)
-  max = todos.map { |todo| todo[:id] }.max || 0
-  max + 1
-end
-
-def next_list_id(lists)
-  max = lists.map { |list| list[:id]}.max || 0
-  max + 1
-end
-
 
 ########
 # Gets #
@@ -78,6 +73,7 @@ get "/lists/new" do
   erb :new_list, layout: :layout
 end
 
+# !!! todo completion isn't being displayed properly, inspect view
 # View a single list
 get "/lists/:id" do 
   list_id = params[:id].to_i
@@ -105,7 +101,8 @@ end
 post "/lists/:id" do 
   list_id = params[:id].to_i
   @list = load_list(list_id)
-  @list[:name] = params[:list_name].strip
+  new_name = params[:list_name].strip
+  @storage.updateListName(id, new_name)
 
   redirect "/lists/#{params[:id]}"
 end 
@@ -115,7 +112,7 @@ post "/lists/:list_id/destroy" do
   list_id = params[:list_id].to_i
   @list = load_list(list_id)
 
-  @storage.delete!(@list)
+  @storage.deleteList!(list_id)
   session[:success] = ("The list has been deleted.")
   
   if env["HTTP_X_REQUESTED_WITH"] == "XMLHttpRequest"
@@ -135,13 +132,15 @@ post '/lists' do
     erb :new_list, layout: :layout
   else
     @lists = @storage.allLists
-    id = next_list_id(@lists)
-    @lists << {id: id, name: list_name, todos: []}
-    session[:success] = ('The list has been created.')
-
+    if @storage.createNewList(list_name) 
+      session[:success] = ('The list has been created.')
+    else
+      session[:error] = "Failed to create new list"
+    end
     redirect "/lists"
   end
 end
+
 
 # Create todos on a list
 post "/lists/:list_id/todos" do 
@@ -156,8 +155,7 @@ post "/lists/:list_id/todos" do
     session[:error] = (error)
     erb :list, layout: :layout
   else
-    id = next_todo_id(@list[:todos])
-    @list[:todos] << {id: id, name: todo_name, complete: false}
+    @storage.createNewTodo(list_id, todo_name)
     
     session[:success] = ('The todo has been created.')
     redirect "/lists/#{list_id}"  
@@ -167,10 +165,9 @@ end
 # Delete a todo on a list
 post "/lists/:list_id/todos/:todo_id" do 
   list_id = params[:list_id].to_i
-  @list = load_list(list_id)
-
   todo_id = params[:todo_id].to_i
-  @list[:todos].reject! { |todo| todo[:id] == todo_id }
+
+  @storage.deleteTodo!(todo_id)
 
   if env["HTTP_X_REQUESTED_WITH"] == "XMLHttpRequest"
     status 204
@@ -183,19 +180,17 @@ end
 # Update status of a todo
 post "/lists/:list_id/todos/:todo_id/update" do 
   list_id = params[:list_id].to_i
-  @list = load_list(list_id)
-
   todo_id = params[:todo_id].to_i
-  todo = @list[:todos].find { |todo| todo[:id] == todo_id }
 
   is_completed = params[:completed] == "true"
-  todo[:complete] = is_completed
+  @storage.updateTodoStatus(todo_id, is_completed)
 
   session[:success] = ("The todo has been updated")
   
   redirect "/lists/#{list_id}"
 end
 
+# !!!
 # Update the states of all todos to all
 post "/lists/:list_id/complete_all" do
   list_id = params[:id].to_i
