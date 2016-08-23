@@ -3,7 +3,7 @@ require "sinatra"
 require "sinatra/content_for"
 require "tilt/erubis"
 
-require_relative "data_persistence.rb"
+require_relative "sequel_persistence.rb"
 
 configure do
   enable :sessions
@@ -14,11 +14,11 @@ end
 
 configure(:development) do
   require "sinatra/reloader"
-  also_reload "data_persistence.rb"
+  also_reload "sequel_persistence.rb"
 end
 
 before do 
-  @storage = DatabasePersistence.new(logger)
+  @storage = SequelPersistence.new(logger)
 end
 
 not_found do 
@@ -102,7 +102,7 @@ post "/lists/:id" do
   list_id = params[:id].to_i
   @list = load_list(list_id)
   new_name = params[:list_name].strip
-  @storage.updateListName(id, new_name)
+  @storage.updateListName(list_id, new_name)
 
   redirect "/lists/#{params[:id]}"
 end 
