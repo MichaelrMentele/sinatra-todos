@@ -73,11 +73,11 @@ get "/lists/new" do
   erb :new_list, layout: :layout
 end
 
-# !!! todo completion isn't being displayed properly, inspect view
 # View a single list
 get "/lists/:id" do 
   list_id = params[:id].to_i
   @list = load_list(list_id)
+  @todos = @storage.getListTodos(list_id)
   erb :list, layout: :layout
 end
 
@@ -221,11 +221,11 @@ helpers do
   end
 
   def list_complete?(list)
-    todos?(list) and todos_complete?(list)
+    list[:todos_count] > 0 && list[:todos_remaining_count] == 0
   end
 
   def list_class(list)
-    if list[:todos].size == 0
+    if list[:todos_count].size == 0
       "new"
     elsif list_complete?(list)
       "complete"
@@ -234,24 +234,12 @@ helpers do
     end
   end
 
-  def incomplete_todos(list)
-    count = 0
-    list[:todos].each do |todo|
-      count += 1 if todo[:complete] != true
-    end
-    count
-  end
-
-  def todos_count(list)
-    list[:todos].size
-  end
-
   def todo_class(todo)
     "complete" if todo_complete?(todo)
   end
 
   def todo_complete?(todo)
-    todo[:complete] == true
+    todo[:completed] == true
   end
 
   def sort_lists(lists, &block)
